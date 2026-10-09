@@ -1,0 +1,138 @@
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardButton
+from agent.models import ApplicationStatus
+
+def get_main_menu_keyboard() -> ReplyKeyboardMarkup:
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="🔎 Поиск вакансий РФ"), KeyboardButton(text="🏢 Стажировки корпораций")],
+            [KeyboardButton(text="📊 Воронка откликов"), KeyboardButton(text="📋 Последние отклики")],
+            [KeyboardButton(text="🎯 Подготовка к интервью"), KeyboardButton(text="🔄 Разбор собеседования")],
+            [KeyboardButton(text="📄 Три готовых резюме"), KeyboardButton(text="📚 Методология SuperJob Pro")],
+            [KeyboardButton(text="👤 Мой профиль"), KeyboardButton(text="ℹ️ Помощь")]
+        ],
+        resize_keyboard=True
+    )
+
+def get_search_categories_keyboard() -> InlineKeyboardMarkup:
+    """Выбор роли для поиска вакансий"""
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="💻 Информационные системы / Junior Dev", callback_data="search_role:is_developer"),
+            ],
+            [
+                InlineKeyboardButton(text="🐍 Python / Backend стажер", callback_data="search_role:backend_python"),
+            ],
+            [
+                InlineKeyboardButton(text="🌐 Frontend / Fullstack разработчик", callback_data="search_role:frontend_fullstack"),
+            ],
+            [
+                InlineKeyboardButton(text="🤖 Чат-боты / AI-инструменты / SQL", callback_data="search_role:ai_chatbot_integrator"),
+            ],
+            [
+                InlineKeyboardButton(text="🔍 Свой поисковый запрос...", callback_data="search_custom:prompt"),
+                InlineKeyboardButton(text="🏢 Стажировки корпораций", callback_data="show_internships:all")
+            ]
+        ]
+    )
+
+def get_resumes_inline_keyboard() -> InlineKeyboardMarkup:
+    """Клавиатура для просмотра 3 базовых резюме и рекомендаций"""
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="1️⃣ Основное (ИС / Junior Dev)", callback_data="view_resume:resume_main_is"),
+            ],
+            [
+                InlineKeyboardButton(text="2️⃣ Вариант 1 (Backend / Python)", callback_data="view_resume:resume_backend_python"),
+            ],
+            [
+                InlineKeyboardButton(text="3️⃣ Вариант 2 (Frontend / Fullstack)", callback_data="view_resume:resume_frontend_fullstack"),
+            ],
+            [
+                InlineKeyboardButton(text="📊 Таблица выбора и рекомендации", callback_data="view_resume:guidelines"),
+            ]
+        ]
+    )
+
+def get_job_item_action_keyboard(search_item_id: str, url: str) -> InlineKeyboardMarkup:
+    """Кнопки действия под карточкой найденной вакансии"""
+    buttons = [
+        [
+            InlineKeyboardButton(text="⚡ Откликнуться (Письмо)", callback_data=f"act_cover:{search_item_id}"),
+            InlineKeyboardButton(text="📊 Скоринг & Риски", callback_data=f"act_score:{search_item_id}")
+        ]
+    ]
+    if url:
+        buttons.append([InlineKeyboardButton(text="🔗 Открыть на сайте", url=url)])
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+def get_job_actions_keyboard(job_id: str) -> InlineKeyboardMarkup:
+    """Кнопки действий после парсинга и скоринга вакансии"""
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="⚡ Краткий отклик (hh/SJ)", callback_data=f"gen_cover_short:{job_id}"),
+                InlineKeyboardButton(text="✉️ Полное письмо (HR)", callback_data=f"gen_cover_det:{job_id}")
+            ],
+            [
+                InlineKeyboardButton(text="📄 Адаптировать резюме", callback_data=f"gen_resume:{job_id}"),
+                InlineKeyboardButton(text="🎯 Интервью (STAR + Tech)", callback_data=f"prep_interview:{job_id}")
+            ],
+            [
+                InlineKeyboardButton(text="🔍 Детальный скоринг и риски", callback_data=f"show_scoring:{job_id}"),
+                InlineKeyboardButton(text="💾 Сохранить в CRM", callback_data=f"save_crm:{job_id}")
+            ]
+        ]
+    )
+
+def get_tailored_resume_actions_keyboard(job_id: str) -> InlineKeyboardMarkup:
+    """Кнопки под адаптированным резюме"""
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="📋 Полный текст для hh.ru", callback_data=f"show_full_resume:{job_id}"),
+                InlineKeyboardButton(text="✉️ Сгенерировать отклик", callback_data=f"gen_cover_short:{job_id}")
+            ],
+            [
+                InlineKeyboardButton(text="💾 Сохранить в CRM", callback_data=f"save_crm:{job_id}"),
+                InlineKeyboardButton(text="🎯 Подготовка к интервью", callback_data=f"prep_interview:{job_id}")
+            ]
+        ]
+    )
+
+def get_status_update_keyboard(app_id: int) -> InlineKeyboardMarkup:
+    """Кнопки смены статуса отклика в CRM"""
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="👁 Просмотрено", callback_data=f"set_st:{app_id}:viewed"),
+                InlineKeyboardButton(text="📞 Скрининг", callback_data=f"set_st:{app_id}:screening")
+            ],
+            [
+                InlineKeyboardButton(text="⏳ Тестовое задание", callback_data=f"set_st:{app_id}:test"),
+                InlineKeyboardButton(text="🎙 Собеседование", callback_data=f"set_st:{app_id}:interview")
+            ],
+            [
+                InlineKeyboardButton(text="🎉 Оффер!", callback_data=f"set_st:{app_id}:offer"),
+                InlineKeyboardButton(text="❌ Отказ", callback_data=f"set_st:{app_id}:reject")
+            ],
+            [
+                InlineKeyboardButton(text="📅 Задать дедлайн ТЗ", callback_data=f"set_dl:{app_id}"),
+                InlineKeyboardButton(text="📝 Добавить заметку", callback_data=f"set_note:{app_id}")
+            ]
+        ]
+    )
+
+def get_copy_letter_keyboard(job_id: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="📄 Адаптировать резюме", callback_data=f"gen_resume:{job_id}"),
+                InlineKeyboardButton(text="💾 Сохранить в CRM", callback_data=f"save_crm:{job_id}")
+            ],
+            [
+                InlineKeyboardButton(text="🎯 Подготовка к интервью", callback_data=f"prep_interview:{job_id}")
+            ]
+        ]
+    )

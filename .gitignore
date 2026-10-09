@@ -1,0 +1,49 @@
+# Environment variables and secrets
+.env
+*.env
+credentials.json
+token.json
+service_account.json
+*.pem
+*.key
+
+# Python cache & virtual environments
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+.venv/
+venv/
+ENV/
+env/
+
+# SQLite databases & logs
+*.db
+*.sqlite
+*.sqlite3
+data/*.db
+*.log
+
+# IDE & OS files
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
