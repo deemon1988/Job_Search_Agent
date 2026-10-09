@@ -11,7 +11,14 @@ from aiogram.types import Message, Update
 
 from config import settings
 from storage import db
-from bot.handlers import vacancies_router, tracker_router, interview_router, search_router
+from bot.handlers import (
+    vacancies_router,
+    tracker_router,
+    interview_router,
+    search_router,
+    plan_router,
+    portfolio_router
+)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -62,6 +69,8 @@ async def main():
         dp.update.middleware(WhitelistMiddleware(allowed_ids))
 
     # Регистрация роутеров
+    dp.include_router(plan_router)
+    dp.include_router(portfolio_router)
     dp.include_router(search_router)
     dp.include_router(interview_router)
     dp.include_router(tracker_router)

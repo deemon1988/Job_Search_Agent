@@ -8,6 +8,7 @@ class CareerVector(str, Enum):
     BACKEND_PYTHON = "backend_python"
     FRONTEND_FULLSTACK = "frontend_fullstack"
     AI_AUTOMATION = "ai_automation"
+    QA_TESTING = "qa_testing"
     DEVOPS_INFRA = "devops_infra"
 
 class ApplicationStatus(str, Enum):
@@ -49,6 +50,10 @@ class JobScoreBreakdown(BaseModel):
     cons_and_risks: List[str] = Field(default_factory=list, description="Обнаруженные риски, Red Flags или завышенные ожидания")
     missing_gaps: List[str] = Field(default_factory=list, description="Пробелы в стеке кандидата под эту вакансию")
     application_strategy: str = Field(description="Экспертная стратегия отклика по SuperJob Pro")
+    is_fully_remote: bool = Field(default=True, description="Действительно ли 100% удаленка из Соснового Бора/Ленобласти")
+    is_junior_friendly: bool = Field(default=True, description="Подходит ли начальный уровень (без опыта / до 1 года)")
+    has_phone_support_risk: bool = False
+    strict_criteria_notes: List[str] = Field(default_factory=list, description="Проверка по 3 обязательным фильтрам")
 
 # Сохраняем обратную совместимость для JobAnalysis
 class JobAnalysis(BaseModel):

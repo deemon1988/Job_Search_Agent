@@ -20,9 +20,11 @@ from agent.cover_letter import CoverLetterGenerator
 from agent.resume import ResumeCustomizer
 from agent.interview import InterviewAssistant
 from agent.job_searcher import JobSearcher, JobSearchResult
+from agent.plan import ActionPlanManager
+from agent.portfolio import PortfolioManager
 
 class JobAgent:
-    """Главный оркестратор AI-агента для поиска работы с интеграцией SuperJob Pro и мультипоиском по РФ"""
+    """Главный оркестратор AI-агента для поиска работы с интеграцией SuperJob Pro, плана действий и портфолио"""
     def __init__(self):
         self.llm = LLMService()
         self.parser = JobParser(self.llm)
@@ -32,6 +34,8 @@ class JobAgent:
         self.resume = ResumeCustomizer(self.llm)
         self.interview = InterviewAssistant(self.llm)
         self.searcher = JobSearcher()
+        self.plan = ActionPlanManager()
+        self.portfolio = PortfolioManager(self.llm)
 
 __all__ = [
     "JobAgent",
@@ -50,5 +54,7 @@ __all__ = [
     "JobParser",
     "JobScorer",
     "JobSearcher",
-    "JobSearchResult"
+    "JobSearchResult",
+    "ActionPlanManager",
+    "PortfolioManager"
 ]

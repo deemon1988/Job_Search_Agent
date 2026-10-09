@@ -63,6 +63,16 @@ async def handle_vacancy_input(message: Message, state: FSMContext):
         }
         tier_label = tier_emoji.get(score_res.priority_tier, score_res.priority_tier)
 
+        strict_alerts = []
+        if score_res.has_phone_support_risk:
+            strict_alerts.append("🚩 *ВНИМАНИЕ: Обнаружен риск работы на телефоне / звонков!*")
+        if not score_res.is_fully_remote:
+            strict_alerts.append("⚠️ *Проверьте формат: возможно требуется офис/гибрид!*")
+        if not score_res.is_junior_friendly:
+            strict_alerts.append("⚠️ *Требования к опыту могут превышать 1–2 года*")
+
+        alerts_block = ("\n" + "\n".join(strict_alerts) + "\n") if strict_alerts else ""
+
         salary_str = parsed_job.salary_raw or "Не указана"
         skills_str = ", ".join(parsed_job.key_skills[:6]) if parsed_job.key_skills else "В описании"
         clean_url = (parsed_job.url or "").split("?")[0]
@@ -70,7 +80,8 @@ async def handle_vacancy_input(message: Message, state: FSMContext):
             f"📌 *{parsed_job.title}*\n"
             f"🏢 Компания: *{parsed_job.company}* | {parsed_job.platform}\n"
             f"💰 Зарплата: *{salary_str}* | 📍 {parsed_job.employment_type}\n"
-            f"{f'🔗 [Ссылка на вакансию]({clean_url})' if clean_url else ''}\n\n"
+            f"{f'🔗 [Ссылка на вакансию]({clean_url})' if clean_url else ''}\n"
+            f"{alerts_block}\n"
             f"📊 *Скоринг соответствия (SuperJob Pro):* `{score_res.total_score}/100`\n"
             f"🏷 *Вердикт:* {tier_label}\n"
             f"🎯 *Вектор:* `{score_res.recommended_vector.value}`\n\n"

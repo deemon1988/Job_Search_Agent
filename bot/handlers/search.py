@@ -46,6 +46,11 @@ async def on_search_role(callback: CallbackQuery):
     role_data = roles.get(role_key, {})
 
     queries_map = {
+        "ai_automation": "AI Automation n8n разработчик ботов",
+        "backend_python": "Junior Python разработчик стажер",
+        "qa_testing": "Junior QA тестировщик без опыта",
+        "is_developer": "Специалист по информационным системам разработчик",
+        "frontend_fullstack": "Junior Frontend разработчик стажер",
         "support_l2_l3": "Специалист технической поддержки L2",
         "junior_python_dev": "Junior Python разработчик стажер",
         "ai_chatbot_integrator": "разработчик чат-ботов Python",
@@ -55,7 +60,7 @@ async def on_search_role(callback: CallbackQuery):
     role_title = role_data.get("title", query)
 
     await callback.answer(f"Ищу: {query}...")
-    wait_msg = await safe_reply(callback.message, f"🔎 Ищу актуальные вакансии для роли: *{role_title}*...")
+    wait_msg = await safe_reply(callback.message, f"🔎 Ищу актуальные вакансии (удаленка / Junior): *{role_title}*...")
 
     # Поиск по hh.ru
     results = await job_agent.searcher.search_hh(query, limit=5)
@@ -185,13 +190,26 @@ async def on_action_from_search(callback: CallbackQuery):
         )
         await safe_edit_text(status_msg, resp, reply_markup=get_job_actions_keyboard(full_job_id))
     else:
+        strict_flags = []
+        if score.has_phone_support_risk:
+            strict_flags.append("🚩 *КРИТИЧЕСКИЙ РИСК: Вакансия на телефоне / колл-центр!*")
+        if not score.is_fully_remote:
+            strict_flags.append("⚠️ *Внимание: возможен гибрид / офис (проверьте город)*")
+        if not score.is_junior_friendly:
+            strict_flags.append("⚠️ *Требования к опыту могут быть завышены для Junior*")
+
+        flags_text = ("\n\n" + "\n".join(strict_flags)) if strict_flags else ""
+        criteria_notes = f"\n🎯 *Проверка фильтров:* _{score.strict_criteria_notes}_" if score.strict_criteria_notes else ""
+
         resp = (
             f"📊 *Скоринг соответствия: {score.total_score}/100 [{score.priority_tier}]*\n"
             f"📌 Вакансия: *{parsed.title}* ({parsed.company})\n\n"
             f"• Hard Skills: `{score.hard_skills_score}/40`\n"
             f"• Соответствие грейду: `{score.experience_grade_score}/25`\n"
             f"• СПО МТИ / ИС: `{score.education_domain_score}/15`\n"
-            f"• Red Flags штрафы: `{score.red_flags_penalty} б.`\n\n"
+            f"• Red Flags штрафы: `{score.red_flags_penalty} б.`"
+            f"{flags_text}"
+            f"{criteria_notes}\n\n"
             f"💡 *Стратегия:* _{score.application_strategy}_"
         )
         await safe_edit_text(status_msg, resp, reply_markup=get_job_actions_keyboard(full_job_id))

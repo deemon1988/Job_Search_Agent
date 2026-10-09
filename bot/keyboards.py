@@ -5,6 +5,7 @@ def get_main_menu_keyboard() -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text="🔎 Поиск вакансий РФ"), KeyboardButton(text="🏢 Стажировки корпораций")],
+            [KeyboardButton(text="📅 План на 30 дней"), KeyboardButton(text="🚀 Проекты для портфолио")],
             [KeyboardButton(text="📊 Воронка откликов"), KeyboardButton(text="📋 Последние отклики")],
             [KeyboardButton(text="🎯 Подготовка к интервью"), KeyboardButton(text="🔄 Разбор собеседования")],
             [KeyboardButton(text="📄 Три готовых резюме"), KeyboardButton(text="📚 Методология SuperJob Pro")],
@@ -14,20 +15,23 @@ def get_main_menu_keyboard() -> ReplyKeyboardMarkup:
     )
 
 def get_search_categories_keyboard() -> InlineKeyboardMarkup:
-    """Выбор роли для поиска вакансий"""
+    """Выбор роли для поиска вакансий с учетом приоритетов и фильтра звонков"""
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
-                InlineKeyboardButton(text="💻 Информационные системы / Junior Dev", callback_data="search_role:is_developer"),
+                InlineKeyboardButton(text="🤖 AI Automation / n8n / Боты", callback_data="search_role:ai_automation"),
             ],
             [
                 InlineKeyboardButton(text="🐍 Python / Backend стажер", callback_data="search_role:backend_python"),
             ],
             [
-                InlineKeyboardButton(text="🌐 Frontend / Fullstack разработчик", callback_data="search_role:frontend_fullstack"),
+                InlineKeyboardButton(text="🧪 Junior QA (без звонков / API)", callback_data="search_role:qa_testing"),
             ],
             [
-                InlineKeyboardButton(text="🤖 Чат-боты / AI-инструменты / SQL", callback_data="search_role:ai_chatbot_integrator"),
+                InlineKeyboardButton(text="💻 Информационные системы / Младший Dev", callback_data="search_role:is_developer"),
+            ],
+            [
+                InlineKeyboardButton(text="🌐 Frontend / Fullstack разработчик", callback_data="search_role:frontend_fullstack"),
             ],
             [
                 InlineKeyboardButton(text="🔍 Свой поисковый запрос...", callback_data="search_custom:prompt"),
@@ -133,6 +137,62 @@ def get_copy_letter_keyboard(job_id: str) -> InlineKeyboardMarkup:
             ],
             [
                 InlineKeyboardButton(text="🎯 Подготовка к интервью", callback_data=f"prep_interview:{job_id}")
+            ]
+        ]
+    )
+
+def get_action_plan_keyboard() -> InlineKeyboardMarkup:
+    """Клавиатура для 30-дневного плана действий"""
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="1️⃣ Неделя 1: База & Флагман", callback_data="view_week:1"),
+                InlineKeyboardButton(text="2️⃣ Неделя 2: Тестирование", callback_data="view_week:2"),
+            ],
+            [
+                InlineKeyboardButton(text="3️⃣ Неделя 3: Масштабирование", callback_data="view_week:3"),
+                InlineKeyboardButton(text="4️⃣ Неделя 4: Оффер & Конверсия", callback_data="view_week:4"),
+            ],
+            [
+                InlineKeyboardButton(text="⏱ Распорядок дня (3–4 часа)", callback_data="view_plan_routine:show"),
+                InlineKeyboardButton(text="🎯 Фильтры & Правила отбора", callback_data="view_plan_rules:show")
+            ]
+        ]
+    )
+
+def get_portfolio_hub_keyboard() -> InlineKeyboardMarkup:
+    """Клавиатура каталога проектов для портфолио"""
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="🤖 Флагман: AI Ticket Processor", callback_data="view_proj:ai_ticket_processor"),
+            ],
+            [
+                InlineKeyboardButton(text="🏥 REST API: Сервис клиники (Django/FastAPI)", callback_data="view_proj:clinic_rest_api"),
+            ],
+            [
+                InlineKeyboardButton(text="🧪 QA Suite: Тестирование API & Баг-репорты", callback_data="view_proj:qa_test_suite"),
+            ],
+            [
+                InlineKeyboardButton(text="📖 Как презентовать AI в портфолио", callback_data="view_proj_philosophy:show")
+            ]
+        ]
+    )
+
+def get_project_actions_keyboard(proj_id: str) -> InlineKeyboardMarkup:
+    """Кнопки действий внутри проекта портфолио"""
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="⚡ Архитектура & Схема данных", callback_data=f"gen_proj_arch:{proj_id}"),
+                InlineKeyboardButton(text="🗓 План разработки на 7 дней", callback_data=f"gen_proj_plan:{proj_id}")
+            ],
+            [
+                InlineKeyboardButton(text="🧪 Негативные сценарии & Тесты", callback_data=f"gen_proj_tests:{proj_id}"),
+                InlineKeyboardButton(text="📄 Шаблон README.md", callback_data=f"gen_proj_readme:{proj_id}")
+            ],
+            [
+                InlineKeyboardButton(text="⬅️ Назад в каталог проектов", callback_data="back_to_projects:list")
             ]
         ]
     )
