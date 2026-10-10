@@ -141,3 +141,59 @@ async def on_receive_note(message: Message, state: FSMContext):
         await message.answer(f"✅ Заметка для отклика #{app_id} сохранена: _{note_text}_", parse_mode="Markdown")
 
     await state.clear()
+
+@router.message(F.text.in_({"📁 Журнал и треки (CSV)", "/csv", "/tracks"}))
+async def show_workspace_and_tracks(message: Message):
+    from storage.workspace import workspace_manager
+    from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+
+    stats = workspace_manager.get_csv_stats()
+    tracks = workspace_manager.list_tracks()
+
+    lines = [
+        "📁 *Рабочее пространство и журнал (career-agent-workspace)*\n",
+        "📊 *Статистика структурированных CSV-реестров:*",
+        f"• 📋 Проверенные вакансии (`vacancies.csv`): `{stats.get('vacancies_csv', 0)}` шт.",
+        f"• 📤 Отклики (`applications.csv`): `{stats.get('applications_csv', 0)}` шт.",
+        f"• 📚 План обучения (`learning_plan.csv`): `{stats.get('learning_plan_csv', 0)}` тем",
+        f"• 🚀 Портфолио (`portfolio_projects.csv`): `{stats.get('portfolio_projects_csv', 0)}` проектов",
+        f"• 🎙 Собеседования (`interview_log.csv`): `{stats.get('interview_log_csv', 0)}` записей",
+        f"• 🎯 Индивидуальные треки (`data/tracks/`): `{stats.get('tracks_count', 0)}` файлов",
+        "\n📖 *Рабочий журнал:* `data/vacancies_and_tracks.md`",
+        "🧠 *База знаний кандидата:* `data/candidate_knowledge_base.md`\n"
+    ]
+
+    buttons = []
+    if tracks:
+        lines.append("🎯 *Созданные карьерные треки:*")
+        for t in tracks[-5:]:
+            lines.append(f"• `{t['track_id']}`: {t['title'][:40]}")
+            buttons.append([
+                InlineKeyboardButton(
+                    text=f"📄 Скачать {t['track_id']}",
+                    callback_data=f"get_track_file:{t['track_id']}"
+                )
+            ])
+    else:
+        lines.append("💡 _Индивидуальные треки пока не созданы. Откройте любую вакансию и нажмите «🎯 Создать трек (TRACK)»!_")
+
+    kb = InlineKeyboardMarkup(inline_keyboard=buttons) if buttons else None
+    await message.answer("\n".join(lines), parse_mode="Markdown", reply_markup=kb)
+
+@router.callback_query(F.data.startswith("get_track_file:"))
+async def on_get_track_file(callback: CallbackQuery):
+    from storage.workspace import workspace_manager
+    from aiogram.types import BufferedInputFile
+
+    track_id = callback.data.split(":")[1]
+    content = workspace_manager.get_track_content(track_id)
+    if not content:
+        await callback.answer("Файл трека не найден.", show_alert=True)
+        return
+
+    await callback.answer(f"Отправляю {track_id}...")
+    doc_file = BufferedInputFile(content.encode("utf-8"), filename=f"{track_id}.md")
+    await callback.message.answer_document(
+        doc_file,
+        caption=f"📄 Карьерный трек {track_id}"
+    )

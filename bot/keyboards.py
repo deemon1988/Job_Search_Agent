@@ -9,7 +9,8 @@ def get_main_menu_keyboard() -> ReplyKeyboardMarkup:
             [KeyboardButton(text="📊 Воронка откликов"), KeyboardButton(text="📋 Последние отклики")],
             [KeyboardButton(text="🎯 Подготовка к интервью"), KeyboardButton(text="🔄 Разбор собеседования")],
             [KeyboardButton(text="📄 Три готовых резюме"), KeyboardButton(text="📚 Методология SuperJob Pro")],
-            [KeyboardButton(text="👤 Мой профиль"), KeyboardButton(text="ℹ️ Помощь")]
+            [KeyboardButton(text="📁 Журнал и треки (CSV)"), KeyboardButton(text="👤 Мой профиль")],
+            [KeyboardButton(text="ℹ️ Помощь")]
         ],
         resize_keyboard=True
     )
@@ -82,11 +83,11 @@ def get_job_actions_keyboard(job_id: str) -> InlineKeyboardMarkup:
             ],
             [
                 InlineKeyboardButton(text="📄 Адаптировать резюме", callback_data=f"gen_resume:{job_id}"),
-                InlineKeyboardButton(text="🎯 Интервью (STAR + Tech)", callback_data=f"prep_interview:{job_id}")
+                InlineKeyboardButton(text="🎯 Создать трек (TRACK)", callback_data=f"create_track:{job_id}")
             ],
             [
                 InlineKeyboardButton(text="🔍 Детальный скоринг и риски", callback_data=f"show_scoring:{job_id}"),
-                InlineKeyboardButton(text="💾 Сохранить в CRM", callback_data=f"save_crm:{job_id}")
+                InlineKeyboardButton(text="💾 Сохранить в CRM / Журнал", callback_data=f"save_crm:{job_id}")
             ]
         ]
     )
@@ -100,8 +101,8 @@ def get_tailored_resume_actions_keyboard(job_id: str) -> InlineKeyboardMarkup:
                 InlineKeyboardButton(text="✉️ Сгенерировать отклик", callback_data=f"gen_cover_short:{job_id}")
             ],
             [
-                InlineKeyboardButton(text="💾 Сохранить в CRM", callback_data=f"save_crm:{job_id}"),
-                InlineKeyboardButton(text="🎯 Подготовка к интервью", callback_data=f"prep_interview:{job_id}")
+                InlineKeyboardButton(text="🎯 Создать трек (TRACK)", callback_data=f"create_track:{job_id}"),
+                InlineKeyboardButton(text="💾 Сохранить в CRM / Журнал", callback_data=f"save_crm:{job_id}")
             ]
         ]
     )

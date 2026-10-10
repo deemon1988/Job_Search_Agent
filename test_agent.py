@@ -62,10 +62,10 @@ async def test_suite():
     print("\n=== ТЕСТ 5: SQLite CRM со скорингом и изолированным хранением вакансий ===")
     from agent.prompts import load_candidate_rules
     rules_content = load_candidate_rules()
-    assert len(rules_content) > 1000, "candidate_profile_rules.md не загрузился или пустой"
-    assert "Профиль кандидата и правила поиска удалённой IT-работы" in rules_content
-    assert "Приоритет A" in rules_content
-    print("✅ Постоянный контекст агента (candidate_profile_rules.md) успешно загружен!")
+    assert len(rules_content) > 1000, "База знаний кандидата не загрузилась или пустая"
+    assert "База знаний кандидата" in rules_content or "Профиль кандидата" in rules_content
+    assert "Инструкция для AI-агента" in rules_content or "ИНСТРУКЦИЯ" in rules_content
+    print("✅ Постоянный контекст агента (candidate_knowledge_base.md + Instruction.md) успешно загружен!")
 
     test_db_path = str(Path(BASE_DIR) / "data" / "test_job_agent_search.db")
     if Path(test_db_path).exists():
@@ -128,8 +128,65 @@ async def test_suite():
     if Path(test_db_path).exists():
         Path(test_db_path).unlink()
 
+    print("\n=== ТЕСТ 7: Рабочее пространство career-agent-workspace (CSV, Журнал, Треки) ===")
+    import tempfile
+    from storage.workspace import WorkspaceManager
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        tmp_path = Path(tmp_dir)
+        dummy_journal = tmp_path / "vacancies_and_tracks.md"
+        dummy_journal.write_text("## 5. Реестр вакансий\n\n## 6. Реестр откликов\n\n## 7. Карточка карьерного трека\n", encoding="utf-8")
+        wm = WorkspaceManager(data_dir=tmp_path)
+
+        # 1. Добавление вакансии в CSV и Markdown-журнал
+        vac_id = wm.add_checked_vacancy(
+            company="Яндекс",
+            job_title="Junior Python Разработчик",
+            url="https://hh.ru/vacancy/123456",
+            source="hh.ru",
+            salary="60 000 руб.",
+            score=88,
+            class_grade="A",
+            gaps="Docker на базовом уровне",
+            next_action="Откликнуться"
+        )
+        assert vac_id == "VAC-0001"
+        assert wm.vacancies_csv.exists()
+        assert wm.journal_md.exists()
+        print(f"✅ Добавлена проверенная вакансия в CSV: {vac_id}")
+
+        # 2. Запись отклика
+        app_csv_id = wm.record_application(
+            vacancy_id=vac_id,
+            resume_version="Junior Python / Web Developer",
+            cover_letter="Текст письма...",
+            submission_method="hh.ru",
+            status="Отправлено"
+        )
+        assert app_csv_id == "APP-0001"
+        assert wm.applications_csv.exists()
+        print(f"✅ Зафиксирован отклик в CSV: {app_csv_id}")
+
+        # 3. Создание и чтение трека
+        track_id = wm.get_next_track_id()
+        assert track_id == "TRACK-0001"
+        track_file = wm.save_track_file(track_id, "# Тестовый карьерный трек\nСтрока 2")
+        assert track_file.exists()
+        assert "Тестовый карьерный трек" in (wm.get_track_content(track_id) or "")
+        tracks_list = wm.list_tracks()
+        assert len(tracks_list) == 1
+        assert tracks_list[0]["track_id"] == "TRACK-0001"
+        print(f"✅ Создан и сохранён карьерный трек: {track_id}")
+
+        # 4. Проверка статистики CSV
+        stats = wm.get_csv_stats()
+        assert stats["vacancies_csv"] == 1
+        assert stats["applications_csv"] == 1
+        assert stats["tracks_count"] == 1
+        print(f"✅ Статистика CSV реестров: {stats}")
+
     print("\n=======================================================")
-    print("🎉 ВСЕ ТЕСТЫ МУЛЬТИПОИСКА И РОЛЕЙ ПРОЙДЕНЫ УСПЕШНО!")
+    print("🎉 ВСЕ ТЕСТЫ МУЛЬТИПОИСКА, РОЛЕЙ И РАБОЧЕГО ПРОСТРАНСТВА ПРОЙДЕНЫ УСПЕШНО!")
     print("=======================================================")
 
 if __name__ == "__main__":

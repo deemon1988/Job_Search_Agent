@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Dict, Any
 
 from aiogram import Router, F
-from aiogram.types import Message, CallbackQuery
+from aiogram.types import Message, CallbackQuery, BufferedInputFile
 from aiogram.fsm.context import FSMContext
 
 from agent import (
@@ -17,7 +17,9 @@ from agent import (
     JobApplication,
     ApplicationStatus
 )
+from agent.prompts import TRACK_BLUEPRINT_PROMPT
 from storage import db, google_sheets
+from storage.workspace import workspace_manager
 from bot.keyboards import get_job_actions_keyboard, get_copy_letter_keyboard, get_status_update_keyboard
 from bot.utils import safe_edit_text, safe_answer, safe_reply
 
@@ -312,6 +314,44 @@ async def on_save_to_crm(callback: CallbackQuery):
     app.id = app_id
     item["app_id"] = app_id
 
+    # Синхронизация с CSV и рабочим журналом (vacancies.csv и vacancies_and_tracks.md)
+    vac_id = item.get("vac_id")
+    if not vac_id:
+        vac_id = workspace_manager.add_checked_vacancy(
+            company=parsed.company,
+            job_title=parsed.title,
+            url=parsed.url or "",
+            source=parsed.platform,
+            posting_date=check_date,
+            status="Подходит" if score.relevance_group in ("A", "B") else "Резерв",
+            remote_confirmed="Да" if score.remote_status == "Подтверждена" else ("Нет" if score.remote_status == "Не подходит" else "Неясно"),
+            work_from_russia_confirmed="Да" if "РФ" in (score.geography_check or "") or score.remote_status == "Подтверждена" else "Неясно",
+            salary=parsed.salary_raw or "Не указана",
+            score=score.total_score,
+            class_grade=score.relevance_group,
+            gaps=score.what_to_improve or ", ".join(score.missing_gaps),
+            next_action=score.next_action or "Откликнуться",
+            next_action_date=check_date,
+            result=app_status.value
+        )
+        item["vac_id"] = vac_id
+
+    if cover_letter:
+        resume_title = "Базовое резюме"
+        if item.get("tailored_resume"):
+            resume_title = getattr(item["tailored_resume"], "tailored_title", "Адаптированное резюме")
+        app_csv_id = workspace_manager.record_application(
+            vacancy_id=vac_id,
+            resume_version=resume_title,
+            cover_letter=cover_letter[:150] + "...",
+            submission_method=parsed.platform,
+            status=app_status.value,
+            employer_response="Ожидается",
+            next_action="Проверить статус отклика",
+            next_action_date=check_date
+        )
+        item["app_csv_id"] = app_csv_id
+
     sheets_status = "не подключена"
     if google_sheets.is_configured():
         synced = await google_sheets.append_application(app)
@@ -320,14 +360,123 @@ async def on_save_to_crm(callback: CallbackQuery):
     await callback.answer("Вакансия успешно сохранена в реестр!")
     await safe_reply(
         callback.message,
-        f"✅ *Вакансия #{app_id} сохранена в отдельный реестр!*\n\n"
+        f"✅ *Вакансия #{app_id} (`{vac_id}`) сохранена в журнал и CSV!*\n\n"
         f"🏢 *{app.company}* — {app.job_title}\n"
         f"📅 Проверена агентом: `{check_date}`\n"
-        f"🏷 Группа соответствия: `{app.relevance_group}`\n"
+        f"🏷 Класс соответствия: `{app.relevance_group}`\n"
         f"🏠 Формат: `{app.remote_status}` | ☎️ Звонки: `{app.phone_support_status}`\n"
         f"📊 Скоринг: `{score.total_score}/100` ({score.priority_tier})\n"
         f"📈 Статус отклика: `{app.status.value}`\n"
+        f"📁 Файлы рабочего пространства: `vacancies.csv` & `vacancies_and_tracks.md`\n"
         f"📑 Google Таблица: {sheets_status}\n\n"
-        f"База знаний остаётся чистой и постоянной, а статус и дата проверки вакансии отслеживаются в CRM 👇",
+        f"База знаний остаётся чистой и постоянной, а статус и дата проверки вакансии отслеживаются в CRM и CSV 👇",
         reply_markup=get_status_update_keyboard(app_id)
     )
+
+@router.callback_query(F.data.startswith("create_track:"))
+async def on_create_track(callback: CallbackQuery):
+    job_id = callback.data.split(":")[1]
+    item = vacancies_cache.get(job_id)
+    if not item:
+        await callback.answer("Сессия вакансии устарела.", show_alert=True)
+        return
+
+    parsed: ParsedJob = item["parsed"]
+    score: JobScoreBreakdown = item["score"]
+    check_date = datetime.now().strftime("%Y-%m-%d")
+
+    vac_id = item.get("vac_id")
+    if not vac_id:
+        vac_id = workspace_manager.add_checked_vacancy(
+            company=parsed.company,
+            job_title=parsed.title,
+            url=parsed.url or "",
+            source=parsed.platform,
+            posting_date=check_date,
+            status="Подходит" if score.relevance_group in ("A", "B") else "Резерв",
+            remote_confirmed="Да" if score.remote_status == "Подтверждена" else "Неясно",
+            work_from_russia_confirmed="Да" if "РФ" in (score.geography_check or "") or score.remote_status == "Подтверждена" else "Неясно",
+            salary=parsed.salary_raw or "Не указана",
+            score=score.total_score,
+            class_grade=score.relevance_group,
+            gaps=score.what_to_improve or ", ".join(score.missing_gaps),
+            next_action=score.next_action or "Откликнуться",
+            next_action_date=check_date,
+            result="Формирование трека"
+        )
+        item["vac_id"] = vac_id
+
+    track_id = workspace_manager.get_next_track_id()
+
+    await callback.answer(f"Генерирую карьерный трек {track_id}...")
+    status_msg = await safe_reply(
+        callback.message,
+        f"🎯 *Формирую индивидуальный карьерный трек `{track_id}` для вакансии `{vac_id}`*...\n\n"
+        f"Составляю 8-этапный план действий, матрицу ликвидации пробелов, ТЗ для портфолио и подготовку к интервью..."
+    )
+
+    import json
+    job_analysis_data = {
+        "title": parsed.title,
+        "company": parsed.company,
+        "platform": parsed.platform,
+        "url": parsed.url,
+        "salary": parsed.salary_raw,
+        "key_skills": parsed.key_skills,
+        "requirements": parsed.requirements_hard,
+        "responsibilities": parsed.responsibilities,
+        "score": score.total_score,
+        "class": score.relevance_group,
+        "missing_gaps": score.missing_gaps,
+        "what_to_improve": score.what_to_improve,
+        "vector": str(score.recommended_vector)
+    }
+
+    prompt = TRACK_BLUEPRINT_PROMPT.format(
+        track_id=track_id,
+        vacancy_id=vac_id,
+        job_title=parsed.title,
+        company=parsed.company,
+        job_url=parsed.url or "Не указана",
+        date_checked=check_date,
+        job_analysis_json=json.dumps(job_analysis_data, ensure_ascii=False, indent=2)
+    )
+
+    try:
+        track_content = await job_agent.llm.generate_text(prompt)
+    except Exception as e:
+        logger.error(f"Ошибка формирования трека: {e}")
+        await safe_edit_text(status_msg, f"❌ Ошибка генерации трека: {e}")
+        return
+
+    # Сохраняем в файл data/tracks/TRACK-XXXX.md
+    saved_path = workspace_manager.save_track_file(track_id, track_content)
+
+    summary_preview = (
+        f"🎯 *Индивидуальный трек `{track_id}` успешно создан!*\n\n"
+        f"📌 *Вакансия:* `{vac_id}` — {parsed.title} ({parsed.company})\n"
+        f"📊 *Класс:* `{score.relevance_group}` | Скоринг: `{score.total_score}/100`\n"
+        f"📁 *Файл сохранён в:* `data/tracks/{track_id}.md`\n\n"
+        f"📋 *В трек включены 8 этапов:*\n"
+        f"1️⃣ Проверка условий и работодателя\n"
+        f"2️⃣ Адаптация резюме под требования\n"
+        f"3️⃣ Точечное сопроводительное письмо\n"
+        f"4️⃣ Подача отклика и контроль\n"
+        f"5️⃣ План устранения пробелов (Learning Plan)\n"
+        f"6️⃣ Пет-проект для GitHub (Portfolio Target)\n"
+        f"7️⃣ Подготовка к техническому скринингу\n"
+        f"8️⃣ Фиксация результатов и статуса\n\n"
+        f"📎 Полный файл прикреплён ниже 👇"
+    )
+
+    await safe_edit_text(status_msg, summary_preview)
+
+    try:
+        doc_file = BufferedInputFile(track_content.encode("utf-8"), filename=f"{track_id}.md")
+        await callback.message.answer_document(
+            doc_file,
+            caption=f"📄 Карьерный трек {track_id} ({parsed.company} - {parsed.title})"
+        )
+    except Exception as e:
+        logger.warning(f"Не удалось отправить файл документа: {e}")
+

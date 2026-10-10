@@ -3,11 +3,24 @@ from pathlib import Path
 from typing import Dict, Any
 
 def load_candidate_rules() -> str:
-    rules_p = Path(__file__).resolve().parent.parent / "data" / "candidate_profile_rules.md"
-    if rules_p.exists():
-        with open(rules_p, "r", encoding="utf-8") as f:
-            return f.read()
-    return ""
+    data_dir = Path(__file__).resolve().parent.parent / "data"
+    contents = []
+    kb_p = data_dir / "candidate_knowledge_base.md"
+    if kb_p.exists():
+        with open(kb_p, "r", encoding="utf-8") as f:
+            contents.append(f.read())
+    else:
+        alt_p = data_dir / "candidate_profile_rules.md"
+        if alt_p.exists():
+            with open(alt_p, "r", encoding="utf-8") as f:
+                contents.append(f.read())
+
+    inst_p = data_dir / "Instruction.md"
+    if inst_p.exists():
+        with open(inst_p, "r", encoding="utf-8") as f:
+            contents.append("\n\n---\n# ИНСТРУКЦИЯ И МЕНТОРСКИЕ РЕКОМЕНДАЦИИ\n" + f.read())
+
+    return "\n\n".join(contents)
 
 def load_profile_context(filepath: str) -> Dict[str, Any]:
     p = Path(filepath)
@@ -204,3 +217,35 @@ INTERVIEW_DEBRIEF_PROMPT = """Кандидат прошел собеседова
   "overall_recommendations": "..."
 }}
 """
+
+TRACK_BLUEPRINT_PROMPT = """Сформируй детальную Карточку карьерного трека (TRACK) для вакансии строго по Разделу 7 журнала `vacancies_and_tracks.md`:
+
+ID трека: {track_id}
+ID вакансии: {vacancy_id}
+Вакансия: {job_title}
+Компания: {company}
+Ссылка: {job_url}
+Дата проверки: {date_checked}
+
+Данные анализа вакансии:
+{job_analysis_json}
+
+Требования к треку:
+1. Идентификация: Заполни поля ID трека, ID вакансии, Название, Компания, Ссылка, Дата проверки, Цель трека, Текущий статус.
+2. Анализ соответствия: Таблица требований вакансии против подтвержденных навыков кандидата (СПО МТИ «Информационные системы», AI, API, базы данных SQL, боты, Python/Django).
+3. План действий (строго 8 этапов с оценкой времени и критериями готовности):
+   - Этап 1: Проверить условия вакансии и работодателя
+   - Этап 2: Адаптировать резюме
+   - Этап 3: Подготовить сопроводительное письмо
+   - Этап 4: Принять решение и отправить отклик
+   - Этап 5: Закрыть важные пробелы
+   - Этап 6: Создать или адаптировать портфолио
+   - Этап 7: Подготовиться к интервью
+   - Этап 8: Обновить статус
+4. План обучения (Learning Plan): 2-4 конкретные темы для закрытия пробелов вакансии, ссылки на официальную документацию/бесплатные курсы и практическое задание.
+5. Портфолио (Portfolio Target): Целевой пет-проект/демо/тестовый набор для репозитория кандидата GitHub (deemon1988), закрывающий требования этой вакансии.
+6. Подготовка к интервью: 5 прицельных технических вопросов со шпаргалкой ответов.
+
+Верни Markdown-документ с заголовком `# Карточка карьерного трека {track_id}`.
+"""
+
