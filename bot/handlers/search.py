@@ -62,8 +62,8 @@ async def on_search_role(callback: CallbackQuery):
     await callback.answer(f"Ищу: {query}...")
     wait_msg = await safe_reply(callback.message, f"🔎 Ищу актуальные вакансии (удаленка / Junior): *{role_title}*...")
 
-    # Поиск по hh.ru
-    results = await job_agent.searcher.search_hh(query, limit=5)
+    # Поиск по hh.ru со строгим фильтром 100% удаленки
+    results = await job_agent.searcher.search_hh(query, remote_only=True, limit=5)
     # Поиск по trudvsem
     trud_results = await job_agent.searcher.search_trudvsem(query, limit=2)
 
@@ -280,14 +280,14 @@ async def on_view_resume(callback: CallbackQuery):
 
     if resume_key == "superjob_links":
         sj_text = (
-            "🔗 *Официальные резюме Дмитрия Турейко на SuperJob:*\n\n"
+            "🔗 *Официальные резюме Дмитрия Турейко на SuperJob и PDF:*\n\n"
             "1️⃣ [Junior Developer (Full-time)](https://www.superjob.ru/resume/junior-developer-56854881.html)\n"
-            "   📥 [Скачать в PDF / Google Drive](https://drive.google.com/file/d/1pJqh4hAiRF_9kNc6c-dqbEAVEZCGTeP-/view?usp=sharing)\n\n"
+            "   📥 [Скачать в PDF (Google Drive)](https://drive.google.com/file/d/1D6zG6edKB_qQPScl_JwUWLK8xPQK9OCo/view?usp=sharing)\n\n"
             "2️⃣ [Junior Web Developer (Part-time)](https://www.superjob.ru/resume/junior-web-developer-56855017.html)\n"
-            "   📥 [Скачать в PDF / Google Drive](https://drive.google.com/file/d/1DGlM56uuK9vx-OMxEUlIVmclq86LWTf6/view?usp=sharing)\n\n"
-            "3️⃣ [Стажёр-разработчик (Intern)](https://www.superjob.ru/resume/stazhjor-razrabotchik-56842902.html)\n"
-            "   📥 [Скачать в PDF / Google Drive](https://drive.google.com/file/d/1MQ2PZ0wIfyL4_P6YV6CVL0kMMM9ULA7a/view?usp=sharing)\n\n"
-            "💡 _Резюме синхронизированы с платформой SuperJob и полностью оптимизированы под требования работодателей._"
+            "   📥 [Скачать в PDF (Google Drive)](https://drive.google.com/file/d/1nA9hXEm7ZgGKQswkJ_okKXY1s2cOwG4w/view?usp=drive_link)\n\n"
+            "3️⃣ [Стажёр-разработчик (Intern)](https://www.superjob.ru/resume/stazhjor-разработчик-56842902.html)\n"
+            "   📥 [Скачать в PDF (Google Drive)](https://drive.google.com/file/d/1_X14ONl0dyvABWNYQmu6l4zI8kla7wWH/view?usp=drive_link)\n\n"
+            "💡 _Резюме синхронизированы с платформой SuperJob, обновлены под 100% удаленный формат и оптимизированы для работодателей._"
         )
         await safe_reply(callback.message, sj_text, disable_web_page_preview=True)
         await callback.answer()
@@ -296,16 +296,20 @@ async def on_view_resume(callback: CallbackQuery):
     if resume_key == "guidelines":
         guidelines_text = (
             "📋 *Функциональная модель составления резюме:*\n\n"
-            "1. **Очищение от «информационного шума»:**\n"
-            "• Автоматически вырезается любой непрофильный и физический труд (склады, стройки, охрана, курьерская доставка, розница).\n"
-            "• Если коммерческого опыта в IT нет — режим «без опыта работы», либо упаковка пет-проектов в проектную практику без ложных мест работы.\n\n"
-            "2. **Лаконичный заголовок:**\n"
-            "• Убираются громоздкие формулировки (например, «специалист по информационным системам»).\n"
-            "• Оставляются 1–2 понятные для HR роли строго под стек (Junior Python / Web Developer, Стажёр-разработчик).\n\n"
-            "3. **Адаптация блока «О себе» (5–7 секунд на чтение):**\n"
-            "• Сплошной текст заменен на списки с буллетами.\n"
-            "• Честное описание уровня (базовый синтаксис, инструменты, Git, без вымышленного Highload).\n\n"
-            "4. **Управление зарплатой:**\n"
+            "1. **Строго 100% удалённая работа (Remote):**\n"
+            "• Только полная или частичная дистанционная работа из г. Сосновый Бор (ЛО).\n"
+            "• Никаких гибридов, офисных дней и обязательных поездок.\n\n"
+            "2. **Правило канонических тегов (Searchability):**\n"
+            "• Строго чистые названия технологий: `Python`, `Django`, `PostgreSQL`, `SQL`, `Git`, `GitHub`, `JavaScript`, `HTML5`, `CSS3`, `Node.js`, `REST API`, `Telegram API`.\n"
+            "• Без скобок, пометок и градаций вроде «(базовый уровень)» в тегах. Уровень раскрывается только в тексте.\n\n"
+            "3. **Очищение от «информационного шума»:**\n"
+            "• Вырезан непрофильный физический труд (склады, стройки, охрана, курьерская доставка, розница).\n"
+            "• Скрыт возраст, убрана ссылка на VK, убрана строка «Русский — не имеет значения».\n"
+            "• СПО МТИ («Информационные системы (по отраслям)», квалификация «Специалист по информационным системам»).\n\n"
+            "4. **Лаконичный заголовок и блок «О себе» (5–7 секунд):**\n"
+            "• 1–2 вводных предложения + 2–3 маркированных списка (•).\n"
+            "• Без пустых клише («стрессоустойчивый», «легкообучаемый») — фокус на ТЗ, трекерах задач и стандартах кода.\n\n"
+            "5. **Управление зарплатой:**\n"
             "• Полный день: 50 000 – 60 000 ₽.\n"
             "• Подработка: 25 000 – 35 000 ₽ (пропорционально часам).\n"
             "• Стажировка: Не указана (скрыта для корпоративных программ)."

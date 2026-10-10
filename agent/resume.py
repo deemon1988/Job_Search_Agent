@@ -67,7 +67,9 @@ class ResumeCustomizer:
         )
 
         superjob_link = r.get("superjob_link", "")
+        pdf_download_link = r.get("pdf_download_link", "")
         sj_block = f"\n🔗 SuperJob: {superjob_link}" if superjob_link else ""
+        pdf_block = f"\n📥 PDF (Google Drive): {pdf_download_link}" if pdf_download_link else ""
 
         skills_list = ", ".join(r.get("skills", []))
 
@@ -75,8 +77,8 @@ class ResumeCustomizer:
             f"═══════════════════════════════════════\n"
             f"📄 {r.get('direction', 'РЕЗЮМЕ')}\n"
             f"═══════════════════════════════════════\n\n"
-            f"📌 КОНТАКТЫ:\n"
-            f"{contacts}{sj_block}\n\n"
+            f"📌 КОНТАКТЫ И ССЫЛКИ:\n"
+            f"{contacts}{sj_block}{pdf_block}\n\n"
             f"🎯 ШАПКА РЕЗЮМЕ:\n"
             f"• Желаемая должность: {r.get('target_title')}\n"
             f"• Зарплата: {r.get('salary', 'Не указана')}\n"
