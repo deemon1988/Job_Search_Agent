@@ -22,63 +22,76 @@ class ResumeCustomizer:
         return self.profile.get("three_resume_templates", {})
 
     def get_base_template(self, vector: CareerVector) -> Dict[str, Any]:
-        """Возвращает базовый статичный шаблон из профиля по вектору"""
+        """Возвращает базовый статичный шаблон из профиля по вектору или ключу занятости"""
         vector_key = vector.value if isinstance(vector, CareerVector) else str(vector)
         resumes = self.get_three_resumes()
+        # Прямой поиск по id или variant_type
+        if vector_key in resumes:
+            return resumes[vector_key]
         for r_id, r_data in resumes.items():
-            if r_data.get("vector_key") == vector_key:
+            if r_data.get("variant_type") == vector_key or r_data.get("vector_key") == vector_key:
                 return r_data
-        return self.profile.get("vectors", {}).get(vector_key, {})
+        # Сопоставление векторов карьерных направлений
+        mapping = {
+            "backend_python": "resume_fulltime",
+            "frontend_fullstack": "resume_parttime",
+            "is_developer": "resume_fulltime",
+            "ai_automation": "resume_fulltime",
+            "qa_testing": "resume_intern"
+        }
+        target_id = mapping.get(vector_key, "resume_fulltime")
+        return resumes.get(target_id, {})
 
     def render_base_resume(self, resume_key: str) -> str:
-        """Рендерит полный текст одного из трех базовых резюме"""
+        """Рендерит готовый результат резюме по функциональной модели (Контакты, Шапка, Навыки, О себе)"""
         resumes = self.get_three_resumes()
         r = resumes.get(resume_key)
         if not r:
-            # fallback
-            return "Резюме не найдено."
+            # Поддержка старых ключей для обратной совместимости
+            compat_map = {
+                "resume_main_is": "resume_fulltime",
+                "resume_backend_python": "resume_fulltime",
+                "resume_frontend_fullstack": "resume_parttime"
+            }
+            target_key = compat_map.get(resume_key, "resume_fulltime")
+            r = resumes.get(target_key)
+            if not r:
+                return "Резюме не найдено."
 
         p = self.profile.get("personal", {})
         contacts = (
-            f"{p.get('location', 'Ленинградская область, гор. Сосновый Бор')} · "
-            f"{p.get('phone', '+79516601092')} · {p.get('email', 'dmn72835@yandex.ru')} · "
-            f"{p.get('github', 'https://github.com/deemon1988')}"
+            f"👤 {p.get('full_name', 'Турейко Дмитрий Валерьевич')}\n"
+            f"📍 {p.get('location', 'Ленинградская область, гор. Сосновый Бор')}\n"
+            f"📞 {p.get('phone', '+79516601092')} · ✉️ {p.get('email', 'dmn72835@yandex.ru')}\n"
+            f"💻 GitHub: {p.get('github', 'https://github.com/deemon1988')}"
         )
 
-        skills_list = "\n".join([f"• {s}" for s in r.get("skills", [])])
-        
-        # Опыт и проекты
-        exp_parts = []
-        for exp in r.get("projects_experience", []):
-            cat = exp.get("category", "")
-            det = exp.get("details", "")
-            exp_parts.append(f"**{cat}**\n{det}")
-        exp_str = "\n\n".join(exp_parts) if exp_parts else "Учебные и самостоятельные задачи."
+        superjob_link = r.get("superjob_link", "")
+        sj_block = f"\n🔗 SuperJob: {superjob_link}" if superjob_link else ""
 
-        # Если есть примечание о примерах проектов
-        note = r.get("project_examples_placeholder", "")
-        if note:
-            exp_str += f"\n\n*Примеры проектов:* _{note}_"
+        skills_list = ", ".join(r.get("skills", []))
 
         text = (
-            f"РЕЗЮМЕ\n"
-            f"{p.get('full_name', 'Турейко Дмитрий Валерьевич')}\n"
-            f"{contacts}\n\n"
-            f"ЖЕЛАЕМАЯ ДОЛЖНОСТЬ\n"
-            f"{r.get('target_title')}\n"
-            f"Альтернативные: {', '.join(r.get('alternative_titles', []))}\n\n"
-            f"ПРОФЕССИОНАЛЬНЫЙ ПРОФИЛЬ\n"
-            f"{r.get('professional_profile')}\n\n"
-            f"КЛЮЧЕВЫЕ НАВЫКИ\n"
-            f"{skills_list}\n\n"
-            f"ПРОЕКТЫ И ПРАКТИЧЕСКИЙ ОПЫТ\n"
-            f"{exp_str}\n\n"
-            f"ОБРАЗОВАНИЕ\n"
+            f"═══════════════════════════════════════\n"
+            f"📄 {r.get('direction', 'РЕЗЮМЕ')}\n"
+            f"═══════════════════════════════════════\n\n"
+            f"📌 КОНТАКТЫ:\n"
+            f"{contacts}{sj_block}\n\n"
+            f"🎯 ШАПКА РЕЗЮМЕ:\n"
+            f"• Желаемая должность: {r.get('target_title')}\n"
+            f"• Зарплата: {r.get('salary', 'Не указана')}\n"
+            f"• Занятость: {r.get('employment_type')}\n"
+            f"• График: {r.get('work_schedule')}\n"
+            f"• Опыт работы: {r.get('experience_status')}\n\n"
+            f"⭐ КЛЮЧЕВЫЕ НАВЫКИ (SKILLS):\n"
+            f"`{skills_list}`\n\n"
+            f"📝 БЛОК «О СЕБЕ» (ГОТОВ К ВСТАВКЕ):\n"
+            f"{r.get('about_me')}\n\n"
+            f"🎓 ОБРАЗОВАНИЕ:\n"
             f"{r.get('education_text')}\n\n"
-            f"ДОПОЛНИТЕЛЬНОЕ ОБРАЗОВАНИЕ\n"
-            f"{r.get('courses_text')}\n\n"
-            f"ДОПОЛНИТЕЛЬНАЯ ИНФОРМАЦИЯ\n"
-            f"{p.get('additional_info', 'Готов выполнить тестовое задание и пройти собеседование.')}"
+            f"📚 ДОПОЛНИТЕЛЬНОЕ ОБРАЗОВАНИЕ:\n"
+            f"{r.get('courses_text')}\n"
+            f"═══════════════════════════════════════"
         )
         return text
 
@@ -96,32 +109,33 @@ class ResumeCustomizer:
         if not customization.full_resume_text:
             p = self.profile.get("personal", {})
             contacts = (
-                f"{p.get('location', 'Ленинградская область, гор. Сосновый Бор')} · "
-                f"{p.get('phone', '+79516601092')} · {p.get('email', 'dmn72835@yandex.ru')} · "
-                f"{p.get('github', 'https://github.com/deemon1988')}"
+                f"👤 {p.get('full_name', 'Турейко Дмитрий Валерьевич')}\n"
+                f"📍 {p.get('location', 'Ленинградская область, гор. Сосновый Бор')}\n"
+                f"📞 {p.get('phone', '+79516601092')} · ✉️ {p.get('email', 'dmn72835@yandex.ru')}\n"
+                f"💻 GitHub: {p.get('github', 'https://github.com/deemon1988')}"
             )
-            skills_str = "\n".join([f"• {s}" for s in customization.priority_skills])
-            highlights = "\n".join([f"• {h.get('project', '')}: {h.get('focus', '')}" for h in customization.project_highlights])
+            skills_str = ", ".join(customization.priority_skills) if customization.priority_skills else "Python, SQL, Django, REST API, Git, HTML/CSS"
 
             customization.full_resume_text = (
-                f"РЕЗЮМЕ (АДАПТИРОВАННОЕ ПОД ВАКАНСИЮ)\n"
-                f"{p.get('full_name', 'Турейко Дмитрий Валерьевич')}\n"
+                f"═══════════════════════════════════════\n"
+                f"📄 АДАПТИРОВАННОЕ РЕЗЮМЕ ПОД ВАКАНСИЮ\n"
+                f"═══════════════════════════════════════\n\n"
+                f"📌 КОНТАКТЫ:\n"
                 f"{contacts}\n\n"
-                f"ЖЕЛАЕМАЯ ДОЛЖНОСТЬ\n"
-                f"{customization.tailored_title}\n\n"
-                f"ПРОФЕССИОНАЛЬНЫЙ ПРОФИЛЬ\n"
+                f"🎯 ШАПКА РЕЗЮМЕ:\n"
+                f"• Желаемая должность: {customization.tailored_title}\n"
+                f"• Занятость: Удаленная работа (Full-time / Part-time)\n"
+                f"• Опыт работы: Без опыта коммерческой разработки / Проектная практика\n\n"
+                f"⭐ КЛЮЧЕВЫЕ НАВЫКИ (7–10 ТЕХНОЛОГИЙ):\n"
+                f"`{skills_str}`\n\n"
+                f"📝 БЛОК «О СЕБЕ» (БУЛЛЕТЫ ДЛЯ HR НА 5-7 СЕКУНД):\n"
                 f"{customization.tailored_summary}\n\n"
-                f"ПРИОРИТЕТНЫЕ НАВЫКИ\n"
-                f"{skills_str}\n\n"
-                f"АКЦЕНТЫ В ПРАКТИКЕ И ПРОЕКТАХ\n"
-                f"{highlights}\n\n"
-                f"ОБРАЗОВАНИЕ\n"
-                f"Московский технологический институт (ОАНО ВО МТИ) | Специальность: Информационные системы (по отраслям)\n\n"
-                f"ДОПОЛНИТЕЛЬНОЕ ОБРАЗОВАНИЕ\n"
-                f"• Базы данных. SQL — удостоверение\n• Проектирование ИС и баз данных — сертификат\n"
-                f"• Python/Django (Urban University) • Java (Maxima IT School) • AI и No-code\n\n"
-                f"ДОПОЛНИТЕЛЬНАЯ ИНФОРМАЦИЯ\n"
-                f"Готов выполнить тестовое задание и быстро освоить стек проекта."
+                f"🎓 ОБРАЗОВАНИЕ:\n"
+                f"Московский технологический институт (ОАНО ВО МТИ) | Информационные системы (по отраслям)\n\n"
+                f"📚 ДОПОЛНИТЕЛЬНОЕ ОБРАЗОВАНИЕ:\n"
+                f"• «Базы данных. SQL» (удостоверение) • Проектирование ИС (сертификат)\n"
+                f"• Python / Django (Urban University) • AI и автоматизация (Zerocoder)\n"
+                f"═══════════════════════════════════════"
             )
 
         return customization

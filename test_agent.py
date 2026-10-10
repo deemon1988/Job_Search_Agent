@@ -33,15 +33,15 @@ async def test_suite():
     assert "backend_python" in roles
     assert "frontend_fullstack" in roles
 
-    print("\n=== ТЕСТ 2: Три основных резюме Дмитрия Турейко ===")
+    print("\n=== ТЕСТ 2: Три основных резюме Дмитрия Турейко (Функциональная модель) ===")
     assert "three_resume_templates" in profile, "three_resume_templates missing"
     three_resumes = profile["three_resume_templates"]
-    assert "resume_main_is" in three_resumes
-    assert "resume_backend_python" in three_resumes
-    assert "resume_frontend_fullstack" in three_resumes
-    print(f"✅ Резюме 1: {three_resumes['resume_main_is']['target_title']}")
-    print(f"✅ Резюме 2: {three_resumes['resume_backend_python']['target_title']}")
-    print(f"✅ Резюме 3: {three_resumes['resume_frontend_fullstack']['target_title']}")
+    assert "resume_fulltime" in three_resumes
+    assert "resume_parttime" in three_resumes
+    assert "resume_intern" in three_resumes
+    print(f"✅ Резюме 1 (Full-time): {three_resumes['resume_fulltime']['target_title']}")
+    print(f"✅ Резюме 2 (Part-time): {three_resumes['resume_parttime']['target_title']}")
+    print(f"✅ Резюме 3 (Intern): {three_resumes['resume_intern']['target_title']}")
 
     print("\n=== ТЕСТ 3: Каталог корпоративных стажировок ===")
     searcher = JobSearcher()

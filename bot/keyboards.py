@@ -41,20 +41,21 @@ def get_search_categories_keyboard() -> InlineKeyboardMarkup:
     )
 
 def get_resumes_inline_keyboard() -> InlineKeyboardMarkup:
-    """Клавиатура для просмотра 3 базовых резюме и рекомендаций"""
+    """Клавиатура для просмотра 3 резюме по форматам занятости и SuperJob профилей"""
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
-                InlineKeyboardButton(text="1️⃣ Основное (ИС / Junior Dev)", callback_data="view_resume:resume_main_is"),
+                InlineKeyboardButton(text="1️⃣ Полный день (50–60k / Remote)", callback_data="view_resume:resume_fulltime"),
             ],
             [
-                InlineKeyboardButton(text="2️⃣ Вариант 1 (Backend / Python)", callback_data="view_resume:resume_backend_python"),
+                InlineKeyboardButton(text="2️⃣ Подработка / Проектно (25–35k)", callback_data="view_resume:resume_parttime"),
             ],
             [
-                InlineKeyboardButton(text="3️⃣ Вариант 2 (Frontend / Fullstack)", callback_data="view_resume:resume_frontend_fullstack"),
+                InlineKeyboardButton(text="3️⃣ Стажёр с обучением (Intern)", callback_data="view_resume:resume_intern"),
             ],
             [
-                InlineKeyboardButton(text="📊 Таблица выбора и рекомендации", callback_data="view_resume:guidelines"),
+                InlineKeyboardButton(text="🔗 Мои резюме на SuperJob", callback_data="view_resume:superjob_links"),
+                InlineKeyboardButton(text="📋 Правила и логика системы", callback_data="view_resume:guidelines"),
             ]
         ]
     )

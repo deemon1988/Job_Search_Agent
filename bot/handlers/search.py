@@ -244,30 +244,32 @@ async def show_corporate_internships(event):
 @router.message(F.text.in_({"📄 Три готовых резюме", "📄 Два готовых резюме", "/resumes"}))
 async def show_resumes_menu(message: Message):
     resumes = job_agent.searcher.get_three_resumes()
-    r1 = resumes.get("resume_main_is", {})
-    r2 = resumes.get("resume_backend_python", {})
-    r3 = resumes.get("resume_frontend_fullstack", {})
+    r1 = resumes.get("resume_fulltime", resumes.get("resume_main_is", {}))
+    r2 = resumes.get("resume_parttime", resumes.get("resume_backend_python", {}))
+    r3 = resumes.get("resume_intern", resumes.get("resume_frontend_fullstack", {}))
 
     text = (
-        "📄 *Три основных направления резюме Дмитрия Турейко:*\n\n"
+        "📄 *Функциональная модель резюме Дмитрия Турейко:*\n\n"
+        "Система автоматически очищает профиль от «информационного шума», убирает непрофильный опыт и бюрократические названия, создавая структурированные карточки под 3 режима занятости:\n\n"
         "═════════════════════════════════\n"
-        f"1️⃣ *{r1.get('direction', 'Основное: Информационные системы / Junior Dev')}*\n"
+        f"1️⃣ *{r1.get('direction', 'Вариант 1: Полный день (Full-time / Remote)')}*\n"
         f"• Должность: `{r1.get('target_title')}`\n"
-        f"• Куда: {r1.get('target_vacancies')}\n\n"
+        f"• Зарплата: `{r1.get('salary', '50 000 – 60 000 ₽')}`\n"
+        f"• Формат: {r1.get('work_schedule', 'Удаленная работа (40 ч/нед)')}\n\n"
         "═════════════════════════════════\n"
-        f"2️⃣ *{r2.get('direction', 'Вариант 1: Junior Backend / Python Developer')}*\n"
+        f"2️⃣ *{r2.get('direction', 'Вариант 2: Подработка / Проектно (Part-time)')}*\n"
         f"• Должность: `{r2.get('target_title')}`\n"
-        f"• Акцент: {r2.get('accent', 'Логика, данные, серверная часть, Python, Django, SQL, API')}\n"
-        f"• Куда: {r2.get('target_vacancies')}\n\n"
+        f"• Зарплата: `{r2.get('salary', '25 000 – 35 000 ₽')}`\n"
+        f"• Формат: {r2.get('work_schedule', 'Неполная дистанционная (от 4 ч/день)')}\n\n"
         "═════════════════════════════════\n"
-        f"3️⃣ *{r3.get('direction', 'Вариант 2: Junior Frontend / Fullstack Developer')}*\n"
+        f"3️⃣ *{r3.get('direction', 'Вариант 3: Стажёр с обучением (Intern / Trainee)')}*\n"
         f"• Должность: `{r3.get('target_title')}`\n"
-        f"• Акцент: {r3.get('accent', 'Интерфейсы, сайты, интерактивность, JavaScript, HTML, Tilda')}\n"
-        f"• Куда: {r3.get('target_vacancies')}\n\n"
+        f"• Зарплата: `{r3.get('salary', 'Не указана (по договоренности)')}`\n"
+        f"• Фокус: {r3.get('experience_status', 'Без коммерческого опыта / рост с наставником')}\n\n"
         "═════════════════════════════════\n"
-        "💡 *Инструкция бота по адаптации:*\n"
-        "Если вакансия отличается по названию — отправьте ссылку или текст вакансии в чат. Бот автоматически сформирует точечно **адаптированное резюме** и сопроводительное письмо!\n\n"
-        "Нажмите кнопку ниже, чтобы открыть полный текст любого резюме или сравнительную таблицу 👇"
+        "💡 *Правило адаптации под вакансии:*\n"
+        "Если название отличается — отправьте ссылку или текст вакансии в чат. Бот адаптирует заголовок, навыки и блок «О себе» со списками на 5–7 секунд просмотра!\n\n"
+        "Выберите вариант ниже для просмотра полного текста 👇"
     )
     from bot.keyboards import get_resumes_inline_keyboard
     await message.answer(text, parse_mode="Markdown", reply_markup=get_resumes_inline_keyboard())
@@ -275,21 +277,38 @@ async def show_resumes_menu(message: Message):
 @router.callback_query(F.data.startswith("view_resume:"))
 async def on_view_resume(callback: CallbackQuery):
     resume_key = callback.data.split(":")[1]
+
+    if resume_key == "superjob_links":
+        sj_text = (
+            "🔗 *Официальные резюме Дмитрия Турейко на SuperJob:*\n\n"
+            "1️⃣ [Junior Developer (Full-time)](https://www.superjob.ru/resume/junior-developer-56854881.html)\n"
+            "   📥 [Скачать в PDF / Google Drive](https://drive.google.com/file/d/1pJqh4hAiRF_9kNc6c-dqbEAVEZCGTeP-/view?usp=sharing)\n\n"
+            "2️⃣ [Junior Web Developer (Part-time)](https://www.superjob.ru/resume/junior-web-developer-56855017.html)\n"
+            "   📥 [Скачать в PDF / Google Drive](https://drive.google.com/file/d/1DGlM56uuK9vx-OMxEUlIVmclq86LWTf6/view?usp=sharing)\n\n"
+            "3️⃣ [Стажёр-разработчик (Intern)](https://www.superjob.ru/resume/stazhjor-razrabotchik-56842902.html)\n"
+            "   📥 [Скачать в PDF / Google Drive](https://drive.google.com/file/d/1MQ2PZ0wIfyL4_P6YV6CVL0kMMM9ULA7a/view?usp=sharing)\n\n"
+            "💡 _Резюме синхронизированы с платформой SuperJob и полностью оптимизированы под требования работодателей._"
+        )
+        await safe_reply(callback.message, sj_text, disable_web_page_preview=True)
+        await callback.answer()
+        return
+
     if resume_key == "guidelines":
         guidelines_text = (
-            "📊 *Рекомендации по выбору и использованию резюме:*\n\n"
-            "| Направление | Основной акцент | Стек | Что показать |\n"
-            "|---|---|---|---|\n"
-            "| **Основное (ИС)** | Комплексный профиль ИС | SQL, БД, Python, Веб | СПО МТИ, БД, боты, интерфейсы |\n"
-            "| **Backend / Python** | Логика, сервер, данные | Python, Django, SQL, API | Запросы БД, боты, API |\n"
-            "| **Frontend / Fullstack** | Интерфейсы, сайты | JS, HTML, Tilda, Node.js | Страницы, интерактивность |\n\n"
-            "📌 *Инструкция для откликов:*\n"
-            "1. **Основное резюме** — для вакансий по информационным системам, специалиста по ИС, работы с БД и общего Junior Developer.\n"
-            "2. **Вариант 1 (Backend/Python)** — для Junior Python Developer, стажёра-разработчика, Junior Backend Developer, сервисов и интеграций.\n"
-            "3. **Вариант 2 (Frontend/Fullstack)** — для Junior Frontend Developer, веб-разработчика, верстки, сайтов и Fullstack.\n"
-            "4. **Примеры проектов** для 2 и 3 резюме пока не заполняются (указываются учебные задачи и направления).\n"
-            "5. Честно указывайте базовый уровень, без вымышленного опыта.\n"
-            "6. **Если вакансия отличается по названию** — бот создаст адаптированное резюме автоматически!"
+            "📋 *Функциональная модель составления резюме:*\n\n"
+            "1. **Очищение от «информационного шума»:**\n"
+            "• Автоматически вырезается любой непрофильный и физический труд (склады, стройки, охрана, курьерская доставка, розница).\n"
+            "• Если коммерческого опыта в IT нет — режим «без опыта работы», либо упаковка пет-проектов в проектную практику без ложных мест работы.\n\n"
+            "2. **Лаконичный заголовок:**\n"
+            "• Убираются громоздкие формулировки (например, «специалист по информационным системам»).\n"
+            "• Оставляются 1–2 понятные для HR роли строго под стек (Junior Python / Web Developer, Стажёр-разработчик).\n\n"
+            "3. **Адаптация блока «О себе» (5–7 секунд на чтение):**\n"
+            "• Сплошной текст заменен на списки с буллетами.\n"
+            "• Честное описание уровня (базовый синтаксис, инструменты, Git, без вымышленного Highload).\n\n"
+            "4. **Управление зарплатой:**\n"
+            "• Полный день: 50 000 – 60 000 ₽.\n"
+            "• Подработка: 25 000 – 35 000 ₽ (пропорционально часам).\n"
+            "• Стажировка: Не указана (скрыта для корпоративных программ)."
         )
         await safe_reply(callback.message, guidelines_text)
         await callback.answer()
@@ -297,12 +316,13 @@ async def on_view_resume(callback: CallbackQuery):
 
     full_text = job_agent.resume.render_base_resume(resume_key)
     resumes = job_agent.searcher.get_three_resumes()
-    title = resumes.get(resume_key, {}).get("target_title", "Резюме")
+    r_item = resumes.get(resume_key, {})
+    title = r_item.get("target_title", "Резюме")
 
     response_text = (
-        f"📄 *Полный текст резюме:* `{title}`\n\n"
+        f"📄 *Готовая карточка резюме:* `{title}`\n\n"
         f"```\n{full_text}\n```\n\n"
-        f"💡 _Вы можете скопировать этот текст и сохранить в своем кабинете на hh.ru / SuperJob._"
+        f"💡 _Текст подготовлен по правилам SuperJob. Вы можете скопировать его для размещения в личном кабинете._"
     )
     await safe_reply(callback.message, response_text)
     await callback.answer()
