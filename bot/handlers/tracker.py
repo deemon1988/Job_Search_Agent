@@ -42,11 +42,13 @@ async def show_recent_applications(message: Message):
 
     for app in apps:
         dt_str = app.created_at.strftime("%d.%m.%Y")
+        check_str = f" | 📅 Проверена: `{app.checked_at}`" if app.checked_at else ""
+        grp_str = f" | 🏷 Группа `{app.relevance_group}`" if app.relevance_group else ""
         dl_info = f"\n⏰ Дедлайн ТЗ: *{app.test_deadline}*" if app.test_deadline else ""
         notes_info = f"\n📝 Заметка: _{app.notes}_" if app.notes else ""
 
         text = (
-            f"📌 *Отклик #{app.id}* ({dt_str})\n"
+            f"📌 *Отклик #{app.id}* ({dt_str}{check_str}{grp_str})\n"
             f"🏢 *{app.company}* — {app.job_title}\n"
             f"📍 Платформа: {app.platform}\n"
             f"📊 Статус: `{app.status.value}`"

@@ -1,6 +1,7 @@
 import uuid
 import logging
 import re
+from datetime import datetime
 from typing import Dict, Any
 
 from aiogram import Router, F
@@ -63,30 +64,47 @@ async def handle_vacancy_input(message: Message, state: FSMContext):
         }
         tier_label = tier_emoji.get(score_res.priority_tier, score_res.priority_tier)
 
+        check_date = datetime.now().strftime("%d.%m.%Y")
+        group_badge = {
+            "A": "🟢 Группа A (Откликаться в первую очередь)",
+            "B": "🟡 Группа B (Откликаться после проверки)",
+            "C": "⚪ Группа C (Резерв)",
+            "EXCLUDE": "🔴 ИСКЛЮЧИТЬ (Не соответствует жестким фильтрам)"
+        }.get(score_res.relevance_group, f"Группа {score_res.relevance_group}")
+
         strict_alerts = []
-        if score_res.has_phone_support_risk:
+        if score_res.has_phone_support_risk or score_res.phone_support_status == "Есть":
             strict_alerts.append("🚩 *ВНИМАНИЕ: Обнаружен риск работы на телефоне / звонков!*")
-        if not score_res.is_fully_remote:
+        if score_res.remote_status == "Не подходит" or not score_res.is_fully_remote:
             strict_alerts.append("⚠️ *Проверьте формат: возможно требуется офис/гибрид!*")
         if not score_res.is_junior_friendly:
-            strict_alerts.append("⚠️ *Требования к опыту могут превышать 1–2 года*")
+            strict_alerts.append("⚠️ *Требования к опыту могут превышать уровень Junior*")
 
         alerts_block = ("\n" + "\n".join(strict_alerts) + "\n") if strict_alerts else ""
 
         salary_str = parsed_job.salary_raw or "Не указана"
         skills_str = ", ".join(parsed_job.key_skills[:6]) if parsed_job.key_skills else "В описании"
         clean_url = (parsed_job.url or "").split("?")[0]
+
         reply_text = (
-            f"📌 *{parsed_job.title}*\n"
-            f"🏢 Компания: *{parsed_job.company}* | {parsed_job.platform}\n"
-            f"💰 Зарплата: *{salary_str}* | 📍 {parsed_job.employment_type}\n"
-            f"{f'🔗 [Ссылка на вакансию]({clean_url})' if clean_url else ''}\n"
+            f"📋 *Карточка проверки вакансии (Раздел 11)*\n\n"
+            f"📌 *Должность:* {parsed_job.title}\n"
+            f"🏢 *Компания:* {parsed_job.company} | {parsed_job.platform}\n"
+            f"{f'🔗 [Прямая ссылка на вакансию]({clean_url})' if clean_url else '🔗 Ссылка: не указана'}\n"
+            f"📅 *Дата проверки:* `{check_date}`\n"
+            f"🧭 *Направление:* `{score_res.recommended_vector.value}`\n"
+            f"🏠 *Удалённость:* `{score_res.remote_status}`\n"
+            f"🗺 *География:* `{score_res.geography_check}`\n"
+            f"💰 *Зарплата:* *{salary_str}*\n"
+            f"🎓 *Опыт:* `{parsed_job.grade}`\n"
+            f"☎️ *Телефонная поддержка:* `{score_res.phone_support_status}`\n"
             f"{alerts_block}\n"
-            f"📊 *Скоринг соответствия (SuperJob Pro):* `{score_res.total_score}/100`\n"
-            f"🏷 *Вердикт:* {tier_label}\n"
-            f"🎯 *Вектор:* `{score_res.recommended_vector.value}`\n\n"
-            f"🛠 *Стек:* {skills_str}\n\n"
-            f"💡 *Стратегия отклика:* _{score_res.application_strategy}_\n\n"
+            f"📊 *Скоринг:* `{score_res.total_score}/100` | {tier_label}\n"
+            f"🏷 *Соответствие:* {group_badge}\n"
+            f"🛠 *Ключевые требования:* {skills_str}\n\n"
+            f"💡 *Почему подходит:*\n_{score_res.why_fits or score_res.application_strategy}_\n\n"
+            f"📚 *Что подтянуть:*\n_{score_res.what_to_improve or 'Критических пробелов нет'}_\n\n"
+            f"🎯 *Следующее действие:* *{score_res.next_action}*\n\n"
             f"Выберите действие ниже 👇"
         )
 
@@ -264,15 +282,29 @@ async def on_save_to_crm(callback: CallbackQuery):
         await callback.answer("Этот отклик уже сохранен в CRM!", show_alert=True)
         return
 
+    check_date = datetime.now().strftime("%Y-%m-%d")
+    app_status = ApplicationStatus.SENT if cover_letter else ApplicationStatus.NEW
+
     app = JobApplication(
+        checked_at=check_date,
+        published_at=None,
         platform=parsed.platform,
         company=parsed.company,
         job_title=parsed.title,
         job_url=parsed.url or "",
         vector=score.recommended_vector,
         cover_letter=cover_letter,
-        status=ApplicationStatus.SENT,
+        status=app_status,
         score=score.total_score,
+        relevance_group=score.relevance_group,
+        remote_status=score.remote_status,
+        geography=score.geography_check,
+        salary_info=parsed.salary_raw or "Не указана",
+        experience_level=parsed.grade,
+        phone_support_status=score.phone_support_status,
+        why_fits=score.why_fits or score.application_strategy,
+        gaps=score.what_to_improve,
+        next_action=score.next_action,
         full_job_text=parsed.raw_text
     )
 
@@ -285,15 +317,17 @@ async def on_save_to_crm(callback: CallbackQuery):
         synced = await google_sheets.append_application(app)
         sheets_status = "✅ синхронизировано" if synced else "⚠️ ошибка синхронизации"
 
-    await callback.answer("Отклик успешно сохранен в CRM!")
+    await callback.answer("Вакансия успешно сохранена в реестр!")
     await safe_reply(
         callback.message,
-        f"✅ *Отклик #{app_id} сохранен в воронку!*\n\n"
+        f"✅ *Вакансия #{app_id} сохранена в отдельный реестр!*\n\n"
         f"🏢 *{app.company}* — {app.job_title}\n"
-        f"📍 Платформа: {app.platform}\n"
+        f"📅 Проверена агентом: `{check_date}`\n"
+        f"🏷 Группа соответствия: `{app.relevance_group}`\n"
+        f"🏠 Формат: `{app.remote_status}` | ☎️ Звонки: `{app.phone_support_status}`\n"
         f"📊 Скоринг: `{score.total_score}/100` ({score.priority_tier})\n"
-        f"📈 Статус: `{app.status.value}`\n"
+        f"📈 Статус отклика: `{app.status.value}`\n"
         f"📑 Google Таблица: {sheets_status}\n\n"
-        f"Вы можете обновлять статус отклика по мере движения по воронке 👇",
+        f"База знаний остаётся чистой и постоянной, а статус и дата проверки вакансии отслеживаются в CRM 👇",
         reply_markup=get_status_update_keyboard(app_id)
     )

@@ -12,6 +12,8 @@ class CareerVector(str, Enum):
     DEVOPS_INFRA = "devops_infra"
 
 class ApplicationStatus(str, Enum):
+    NEW = "Новый"
+    RESERVE = "В резерве"
     SENT = "Отправлено"
     VIEWED = "Просмотрено"
     SCREENING = "Скрининг"
@@ -19,6 +21,18 @@ class ApplicationStatus(str, Enum):
     INTERVIEW = "Собеседование"
     OFFER = "Оффер"
     REJECTED = "Отказ"
+    ARCHIVED = "Архив / Закрыта"
+
+class RelevanceGroup(str, Enum):
+    GROUP_A = "A"       # A — откликаться в первую очередь
+    GROUP_B = "B"       # B — откликаться после проверки
+    GROUP_C = "C"       # C — резерв
+    EXCLUDE = "EXCLUDE" # Исключить (офис/гибрид, звонки, выезды)
+
+class RemoteStatus(str, Enum):
+    CONFIRMED = "Подтверждена"
+    UNCLEAR = "Неясно"
+    UNSUITABLE = "Не подходит"
 
 class ParsedJob(BaseModel):
     title: str = Field(description="Название должности")
@@ -40,8 +54,22 @@ class ParsedJob(BaseModel):
 class JobScoreBreakdown(BaseModel):
     total_score: int = Field(description="Итоговый скоринг соответствия (0-100)")
     priority_tier: str = Field(description="Приоритет: HIGH (Высокий), MEDIUM (Средний), LOW (Низкий)")
-    hard_skills_score: int = Field(default=35, description="Баллы за Hard Skills (до 40)")
-    experience_grade_score: int = Field(default=20, description="Баллы за грейд и опыт (до 25)")
+    relevance_group: str = Field(default="A", description="Группа соответствия: A (в первую очередь), B (после проверки), C (резерв), EXCLUDE (исключить)")
+    remote_status: str = Field(default="Подтверждена", description="Подтверждена / Неясно / Не подходит")
+    phone_support_status: str = Field(default="Нет", description="Нет / Есть / Неясно")
+    geography_check: str = Field(default="Подтверждена (РФ)", description="Доступность для кандидата из РФ / ЛО")
+    salary_assessment: str = Field(default="Соответствует (40-60k)", description="Оценка зарплаты")
+    why_fits: str = Field(default="", description="Краткая аргументация по профилю кандидата")
+    what_to_improve: str = Field(default="", description="Существенные пробелы стека")
+    next_action: str = Field(default="Откликнуться", description="Откликнуться / Уточнить условия / Пропустить")
+    remote_score: int = Field(default=25, description="Баллы за подтвержденную удаленку из РФ (до 25)")
+    no_phone_score: int = Field(default=20, description="Баллы за отсутствие звонков и выездов (до 20)")
+    junior_grade_score: int = Field(default=15, description="Баллы за соответствие уровню Junior/стажер/без опыта (до 15)")
+    salary_score: int = Field(default=15, description="Баллы за соответствие зарплаты цели 40-60к (до 15)")
+    tech_and_projects_score: int = Field(default=15, description="Баллы за соответствие опыту с ИИ, API, БД и проектами (до 15)")
+    transparency_score: int = Field(default=10, description="Баллы за актуальность, прозрачность и возможность отклика (до 10)")
+    hard_skills_score: int = Field(default=35, description="Баллы за Hard Skills (до 40, обратная совместимость)")
+    experience_grade_score: int = Field(default=20, description="Баллы за грейд и опыт (до 25, обратная совместимость)")
     education_domain_score: int = Field(default=15, description="Баллы за профильное образование МТИ и ИС (до 15)")
     conditions_score: int = Field(default=10, description="Баллы за условия и прозрачность (до 10)")
     red_flags_penalty: int = Field(default=0, description="Штраф за Red Flags (от 0 до -25)")
@@ -49,11 +77,11 @@ class JobScoreBreakdown(BaseModel):
     pros: List[str] = Field(default_factory=list, description="Сильные стороны вакансии и совпадения")
     cons_and_risks: List[str] = Field(default_factory=list, description="Обнаруженные риски, Red Flags или завышенные ожидания")
     missing_gaps: List[str] = Field(default_factory=list, description="Пробелы в стеке кандидата под эту вакансию")
-    application_strategy: str = Field(description="Экспертная стратегия отклика по SuperJob Pro")
+    application_strategy: str = Field(description="Экспертная стратегия отклика")
     is_fully_remote: bool = Field(default=True, description="Действительно ли 100% удаленка из Соснового Бора/Ленобласти")
     is_junior_friendly: bool = Field(default=True, description="Подходит ли начальный уровень (без опыта / до 1 года)")
     has_phone_support_risk: bool = False
-    strict_criteria_notes: List[str] = Field(default_factory=list, description="Проверка по 3 обязательным фильтрам")
+    strict_criteria_notes: List[str] = Field(default_factory=list, description="Проверка по 7 обязательным фильтрам")
 
 # Сохраняем обратную совместимость для JobAnalysis
 class JobAnalysis(BaseModel):
@@ -144,14 +172,26 @@ class InterviewDebrief(BaseModel):
 class JobApplication(BaseModel):
     id: Optional[int] = None
     created_at: datetime = Field(default_factory=datetime.now)
+    checked_at: Optional[str] = Field(default=None, description="Дата проверки объявления (ГГГГ-ММ-ДД)")
+    published_at: Optional[str] = Field(default=None, description="Дата публикации объявления")
     platform: str = "hh.ru"
     company: str
     job_title: str
     job_url: str = ""
     vector: CareerVector = CareerVector.BACKEND_PYTHON
     cover_letter: str = ""
-    status: ApplicationStatus = ApplicationStatus.SENT
+    status: ApplicationStatus = ApplicationStatus.NEW
     score: Optional[int] = None
+    relevance_group: Optional[str] = Field(default="A", description="A / B / C / EXCLUDE")
+    remote_status: Optional[str] = Field(default="Подтверждена", description="Подтверждена / Неясно / Не подходит")
+    geography: Optional[str] = Field(default="РФ / Ленобласть", description="География найма")
+    salary_info: Optional[str] = Field(default=None, description="Вилка, налоги, фикс/проект")
+    experience_level: Optional[str] = Field(default="Junior / Без опыта", description="Требуемый уровень")
+    phone_support_status: Optional[str] = Field(default="Нет", description="Нет / Есть / Неясно")
+    why_fits: Optional[str] = Field(default=None, description="Краткая аргументация по профилю кандидата")
+    gaps: Optional[str] = Field(default=None, description="Существенные пробелы, что подтянуть")
+    next_action: Optional[str] = Field(default="Откликнуться", description="Откликнуться / Уточнить условия / Пропустить")
     test_deadline: Optional[str] = None
     notes: Optional[str] = None
     full_job_text: Optional[str] = None
+

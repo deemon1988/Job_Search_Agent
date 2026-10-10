@@ -59,7 +59,14 @@ async def test_suite():
         top = hh_results[0]
         print(f"  • Пример: [{top.company}] {top.title} ({top.salary}) -> {top.url}")
 
-    print("\n=== ТЕСТ 5: SQLite CRM со скорингом ===")
+    print("\n=== ТЕСТ 5: SQLite CRM со скорингом и изолированным хранением вакансий ===")
+    from agent.prompts import load_candidate_rules
+    rules_content = load_candidate_rules()
+    assert len(rules_content) > 1000, "candidate_profile_rules.md не загрузился или пустой"
+    assert "Профиль кандидата и правила поиска удалённой IT-работы" in rules_content
+    assert "Приоритет A" in rules_content
+    print("✅ Постоянный контекст агента (candidate_profile_rules.md) успешно загружен!")
+
     test_db_path = str(Path(BASE_DIR) / "data" / "test_job_agent_search.db")
     if Path(test_db_path).exists():
         Path(test_db_path).unlink()
@@ -68,18 +75,36 @@ async def test_suite():
     await test_db.init_db()
 
     app = JobApplication(
+        checked_at="2026-10-10",
         platform="hh.ru",
         company="ИнфоТеКС Партнер",
         job_title="Стажер исследователь / программист",
         job_url="https://infotecs.ru",
         vector=CareerVector.BACKEND_PYTHON,
         cover_letter="Письмо...",
-        status=ApplicationStatus.SENT,
-        score=92
+        status=ApplicationStatus.NEW,
+        score=92,
+        relevance_group="A",
+        remote_status="Подтверждена",
+        salary_info="50 000 руб.",
+        next_action="Откликнуться"
     )
     app_id = await test_db.add_application(app)
     assert app_id > 0
-    print(f"✅ Отклик добавлен успешно, ID: {app_id}, score: {app.score}")
+    saved_app = await test_db.get_application(app_id)
+    assert saved_app is not None
+    assert saved_app.checked_at == "2026-10-10"
+    assert saved_app.status == ApplicationStatus.NEW
+    assert saved_app.relevance_group == "A"
+    print(f"✅ Вакансия изолированно сохранена: ID={app_id}, дата проверки={saved_app.checked_at}, статус={saved_app.status.value}, группа={saved_app.relevance_group}")
+
+    # Обновление статуса и даты
+    await test_db.update_status(app_id, ApplicationStatus.SENT)
+    await test_db.update_checked_at(app_id, "2026-10-11")
+    updated_app = await test_db.get_application(app_id)
+    assert updated_app.status == ApplicationStatus.SENT
+    assert updated_app.checked_at == "2026-10-11"
+    print(f"✅ Статус отклика и дата проверки успешно обновлены: статус={updated_app.status.value}, проверено={updated_app.checked_at}")
 
     print("\n=== ТЕСТ 6: Поддержка моделей gpt-6-luna и gemini-3-flash ===")
     from agent.llm import LLMService, is_reasoning_model

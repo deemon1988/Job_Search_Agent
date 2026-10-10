@@ -2,7 +2,7 @@ import aiosqlite
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Union
 from config import settings
 from agent.models import JobApplication, ApplicationStatus, CareerVector
 
@@ -19,6 +19,8 @@ class Database:
                 CREATE TABLE IF NOT EXISTS applications (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     created_at TEXT NOT NULL,
+                    checked_at TEXT,
+                    published_at TEXT,
                     platform TEXT NOT NULL,
                     company TEXT NOT NULL,
                     job_title TEXT NOT NULL,
@@ -27,29 +29,58 @@ class Database:
                     cover_letter TEXT,
                     status TEXT NOT NULL,
                     score INTEGER,
+                    relevance_group TEXT,
+                    remote_status TEXT,
+                    geography TEXT,
+                    salary_info TEXT,
+                    experience_level TEXT,
+                    phone_support_status TEXT,
+                    why_fits TEXT,
+                    gaps TEXT,
+                    next_action TEXT,
                     test_deadline TEXT,
                     notes TEXT,
                     full_job_text TEXT
                 )
             """)
-            # Проверяем наличие колонки score для обратной совместимости
-            try:
-                await db.execute("ALTER TABLE applications ADD COLUMN score INTEGER")
-            except Exception:
-                pass # колонка уже существует
+            # Миграции колонок для существующей базы данных
+            columns_to_add = [
+                ("score", "INTEGER"),
+                ("checked_at", "TEXT"),
+                ("published_at", "TEXT"),
+                ("relevance_group", "TEXT"),
+                ("remote_status", "TEXT"),
+                ("geography", "TEXT"),
+                ("salary_info", "TEXT"),
+                ("experience_level", "TEXT"),
+                ("phone_support_status", "TEXT"),
+                ("why_fits", "TEXT"),
+                ("gaps", "TEXT"),
+                ("next_action", "TEXT"),
+            ]
+            for col_name, col_type in columns_to_add:
+                try:
+                    await db.execute(f"ALTER TABLE applications ADD COLUMN {col_name} {col_type}")
+                except Exception:
+                    pass  # Колонка уже существует
 
             await db.commit()
-            logger.info("Database initialized successfully.")
+            logger.info("Database initialized successfully with full vacancy tracking support.")
 
     async def add_application(self, app: JobApplication) -> int:
+        checked_date = app.checked_at or datetime.now().strftime("%Y-%m-%d")
         async with aiosqlite.connect(self.db_path) as db:
             cursor = await db.execute("""
                 INSERT INTO applications (
-                    created_at, platform, company, job_title, job_url,
-                    vector, cover_letter, status, score, test_deadline, notes, full_job_text
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    created_at, checked_at, published_at, platform, company, job_title, job_url,
+                    vector, cover_letter, status, score, relevance_group, remote_status,
+                    geography, salary_info, experience_level, phone_support_status,
+                    why_fits, gaps, next_action, test_deadline, notes, full_job_text
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 app.created_at.isoformat(),
+                checked_date,
+                app.published_at,
                 app.platform,
                 app.company,
                 app.job_title,
@@ -58,6 +89,15 @@ class Database:
                 app.cover_letter,
                 app.status.value if isinstance(app.status, ApplicationStatus) else str(app.status),
                 app.score,
+                app.relevance_group,
+                app.remote_status,
+                app.geography,
+                app.salary_info,
+                app.experience_level,
+                app.phone_support_status,
+                app.why_fits,
+                app.gaps,
+                app.next_action,
                 app.test_deadline,
                 app.notes,
                 app.full_job_text
@@ -66,12 +106,23 @@ class Database:
             app_id = cursor.lastrowid
             return app_id
 
-    async def update_status(self, app_id: int, status: ApplicationStatus) -> bool:
+    async def update_status(self, app_id: int, status: Union[ApplicationStatus, str]) -> bool:
         status_val = status.value if isinstance(status, ApplicationStatus) else str(status)
         async with aiosqlite.connect(self.db_path) as db:
             cursor = await db.execute(
                 "UPDATE applications SET status = ? WHERE id = ?",
                 (status_val, app_id)
+            )
+            await db.commit()
+            return cursor.rowcount > 0
+
+    async def update_checked_at(self, app_id: int, checked_at: Optional[str] = None) -> bool:
+        """Обновляет дату проверки актуальности вакансии"""
+        val = checked_at or datetime.now().strftime("%Y-%m-%d")
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.execute(
+                "UPDATE applications SET checked_at = ? WHERE id = ?",
+                (val, app_id)
             )
             await db.commit()
             return cursor.rowcount > 0
@@ -106,19 +157,28 @@ class Database:
                 return None
             return self._row_to_app(row)
 
-    async def list_applications(self, status: Optional[str] = None, limit: int = 50) -> List[JobApplication]:
+    async def list_applications(
+        self,
+        status: Optional[str] = None,
+        relevance_group: Optional[str] = None,
+        limit: int = 50
+    ) -> List[JobApplication]:
         async with aiosqlite.connect(self.db_path) as db:
             db.row_factory = aiosqlite.Row
+            conditions = []
+            params = []
             if status:
-                cursor = await db.execute(
-                    "SELECT * FROM applications WHERE status = ? ORDER BY id DESC LIMIT ?",
-                    (status, limit)
-                )
-            else:
-                cursor = await db.execute(
-                    "SELECT * FROM applications ORDER BY id DESC LIMIT ?",
-                    (limit,)
-                )
+                conditions.append("status = ?")
+                params.append(status)
+            if relevance_group:
+                conditions.append("relevance_group = ?")
+                params.append(relevance_group)
+
+            where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+            query = f"SELECT * FROM applications {where_clause} ORDER BY id DESC LIMIT ?"
+            params.append(limit)
+
+            cursor = await db.execute(query, tuple(params))
             rows = await cursor.fetchall()
             return [self._row_to_app(r) for r in rows]
 
@@ -139,18 +199,29 @@ class Database:
         score = row["score"] if "score" in keys else None
         return JobApplication(
             id=row["id"],
-            created_at=datetime.fromisoformat(row["created_at"]),
-            platform=row["platform"],
-            company=row["company"],
-            job_title=row["job_title"],
-            job_url=row["job_url"] or "",
-            vector=CareerVector(row["vector"]) if row["vector"] in [v.value for v in CareerVector] else CareerVector.BACKEND_PYTHON,
-            cover_letter=row["cover_letter"] or "",
-            status=ApplicationStatus(row["status"]) if row["status"] in [s.value for s in ApplicationStatus] else ApplicationStatus.SENT,
+            created_at=datetime.fromisoformat(row["created_at"]) if "created_at" in keys and row["created_at"] else datetime.now(),
+            checked_at=row["checked_at"] if "checked_at" in keys else None,
+            published_at=row["published_at"] if "published_at" in keys else None,
+            platform=row["platform"] if "platform" in keys else "hh.ru",
+            company=row["company"] if "company" in keys else "Компания",
+            job_title=row["job_title"] if "job_title" in keys else "Вакансия",
+            job_url=row["job_url"] if "job_url" in keys and row["job_url"] else "",
+            vector=CareerVector(row["vector"]) if "vector" in keys and row["vector"] in [v.value for v in CareerVector] else CareerVector.BACKEND_PYTHON,
+            cover_letter=row["cover_letter"] if "cover_letter" in keys and row["cover_letter"] else "",
+            status=ApplicationStatus(row["status"]) if "status" in keys and row["status"] in [s.value for s in ApplicationStatus] else ApplicationStatus.SENT,
             score=score,
-            test_deadline=row["test_deadline"],
-            notes=row["notes"],
-            full_job_text=row["full_job_text"]
+            relevance_group=row["relevance_group"] if "relevance_group" in keys else None,
+            remote_status=row["remote_status"] if "remote_status" in keys else None,
+            geography=row["geography"] if "geography" in keys else "РФ / Ленобласть",
+            salary_info=row["salary_info"] if "salary_info" in keys else None,
+            experience_level=row["experience_level"] if "experience_level" in keys else None,
+            phone_support_status=row["phone_support_status"] if "phone_support_status" in keys else "Нет",
+            why_fits=row["why_fits"] if "why_fits" in keys else None,
+            gaps=row["gaps"] if "gaps" in keys else None,
+            next_action=row["next_action"] if "next_action" in keys else None,
+            test_deadline=row["test_deadline"] if "test_deadline" in keys else None,
+            notes=row["notes"] if "notes" in keys else None,
+            full_job_text=row["full_job_text"] if "full_job_text" in keys else None
         )
 
 db = Database()
